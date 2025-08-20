@@ -188,51 +188,27 @@ function PaymentTerminal() {
 
   const selectedProtocol = watch('protocol');
 
-  // Format card number with spaces every 4 digits
   const formatCardNumber = (value) => {
     if (!value) return '';
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
+    const v = value.replace(/\D/g, '');
+    return v.match(/.{1,4}/g)?.join(' ') || '';
   };
 
-  // Format expiry date with slash
   const formatExpiryDate = (value) => {
     if (!value) return '';
     const v = value.replace(/\D/g, '');
-    if (v.length >= 2) {
-      return `${v.substring(0, 2)}/${v.substring(2, 4)}`;
-    }
+    if (v.length >= 3) return `${v.slice(0, 2)}/${v.slice(2, 4)}`;
     return v;
   };
 
-  // Handle card number input
-  const handleCardNumberChange = (e) => {
-    const formatted = formatCardNumber(e.target.value);
-    setValue('cardNumber', formatted);
-  };
+  const handleCardNumberChange = (e) => setValue('cardNumber', formatCardNumber(e.target.value));
+  const handleExpiryDateChange = (e) => setValue('expiryDate', formatExpiryDate(e.target.value));
 
-  // Handle expiry date input
-  const handleExpiryDateChange = (e) => {
-    const formatted = formatExpiryDate(e.target.value);
-    setValue('expiryDate', formatted);
-  };
-
-  // Socket event listeners
   useEffect(() => {
     if (socket) {
-      socket.on('mti_notification', (notification) => {
+      const handler = (notification) => {
         setMtiNotifications(prev => [notification, ...prev.slice(0, 9)]);
-        
+
         if (notification.transactionId === currentTransaction?.transactionId) {
           setCurrentTransaction(prev => ({
             ...prev,
@@ -241,37 +217,24 @@ function PaymentTerminal() {
           }));
         }
 
-        // Show toast for important notifications
         if (notification.mti === '0110') {
-          if (notification.status === 'approved') {
-            toast.success('Transaction Approved!');
-          } else {
-            toast.error('Transaction Declined');
-          }
-        } else if (notification.mti === '0210') {
-          if (notification.status === 'completed') {
-            toast.success('Payment Completed!');
-          }
+          notification.status === 'approved' ? toast.success('Transaction Approved!') : toast.error('Transaction Declined');
+        } else if (notification.mti === '0210' && notification.status === 'completed') {
+          toast.success('Payment Completed!');
         } else if (notification.mti === 'PAYOUT') {
           toast.info(`Payout initiated via ${notification.payoutMethod}`);
         }
-      });
-
-      return () => {
-        socket.off('mti_notification');
       };
+
+      socket.on('mti_notification', handler);
+      return () => socket.off('mti_notification', handler);
     }
   }, [socket, currentTransaction]);
 
   const onSubmit = async (data) => {
     setProcessing(true);
-    
     try {
-      const response = await api.post('/transactions/process', {
-        ...data,
-        isOnline
-      });
-
+      const response = await api.post('/transactions/process', { ...data, isOnline });
       if (response.data.success) {
         setCurrentTransaction({
           transactionId: response.data.transactionId,
@@ -281,9 +244,8 @@ function PaymentTerminal() {
           protocol: data.protocol,
           startTime: new Date().toISOString()
         });
-        
         toast.success('Transaction initiated successfully!');
-        reset(); // Clear form after successful submission
+        reset();
       }
     } catch (error) {
       toast.error(error.response?.data?.error || 'Transaction failed');
@@ -292,16 +254,13 @@ function PaymentTerminal() {
     }
   };
 
-  const getRequiredAuthCodeLength = () => {
-    return selectedProtocol ? PROTOCOLS[selectedProtocol] : 4;
-  };
+  const getRequiredAuthCodeLength = () => selectedProtocol ? PROTOCOLS[selectedProtocol] : 4;
 
   return (
     <TerminalContainer>
       <TerminalCard>
         <Title>
-          <CreditCard size={32} />
-          Payment Terminal
+          <CreditCard size={32} /> Payment Terminal
           {connected ? <Wifi size={24} color="green" /> : <WifiOff size={24} color="red" />}
         </Title>
 
@@ -319,15 +278,12 @@ function PaymentTerminal() {
           <FormGroup>
             <Label>Card Number</Label>
             <Input
-              {...register('cardNumber', { 
+              {...register('cardNumber', {
                 required: 'Card number is required',
-                pattern: {
-                  value: /^[\d\s]{13,19}$/,
-                  message: 'Invalid card number'
-                }
+                pattern: { value: /^[\d\s]{13,19}$/, message: 'Invalid card number' }
               })}
               placeholder="0000 0000 0000 0000"
-              maxLength="19"
+              maxLength={19}
               onChange={handleCardNumberChange}
               className={errors.cardNumber ? 'error' : ''}
             />
@@ -338,7 +294,7 @@ function PaymentTerminal() {
             <FormGroup>
               <Label>Amount ($)</Label>
               <Input
-                {...register('amount', { 
+                {...register('amount', {
                   required: 'Amount is required',
                   min: { value: 0.01, message: 'Amount must be greater than 0' }
                 })}
@@ -353,15 +309,12 @@ function PaymentTerminal() {
             <FormGroup>
               <Label>Expiry Date</Label>
               <Input
-                {...register('expiryDate', { 
+                {...register('expiryDate', {
                   required: 'Expiry date is required',
-                  pattern: {
-                    value: /^(0[1-9]|1[0-2])\/\d{2}$/,
-                    message: 'Format: MM/YY'
-                  }
+                  pattern: { value: /^(0[1-9]|1[0-2])\/\d{2}$/, message: 'Format: MM/YY' }
                 })}
                 placeholder="MM/YY"
-                maxLength="5"
+                maxLength={5}
                 onChange={handleExpiryDateChange}
                 className={errors.expiryDate ? 'error' : ''}
               />
@@ -371,15 +324,12 @@ function PaymentTerminal() {
             <FormGroup>
               <Label>CVV</Label>
               <Input
-                {...register('cvv', { 
+                {...register('cvv', {
                   required: 'CVV is required',
-                  pattern: {
-                    value: /^\d{3,4}$/,
-                    message: 'Invalid CVV'
-                  }
+                  pattern: { value: /^\d{3,4}$/, message: 'Invalid CVV' }
                 })}
                 type="password"
-                maxLength="4"
+                maxLength={4}
                 placeholder="000"
                 className={errors.cvv ? 'error' : ''}
               />
@@ -389,15 +339,9 @@ function PaymentTerminal() {
 
           <FormGroup>
             <Label>Protocol</Label>
-            <Select
-              {...register('protocol', { required: 'Protocol is required' })}
-            >
+            <Select {...register('protocol', { required: 'Protocol is required' })}>
               <option value="">Select Protocol</option>
-              {Object.keys(PROTOCOLS).map(protocol => (
-                <option key={protocol} value={protocol}>
-                  {protocol}
-                </option>
-              ))}
+              {Object.keys(PROTOCOLS).map(p => <option key={p} value={p}>{p}</option>)}
             </Select>
             {errors.protocol && <ErrorMessage>{errors.protocol.message}</ErrorMessage>}
           </FormGroup>
@@ -408,27 +352,20 @@ function PaymentTerminal() {
               <Lock size={16} style={{ marginLeft: '5px' }} />
             </Label>
             <Input
-              {...register('authCode', { 
+              {...register('authCode', {
                 required: 'Authorization code is required',
-                pattern: {
-                  value: new RegExp(`^\\d{${getRequiredAuthCodeLength()}}$`),
-                  message: `Must be exactly ${getRequiredAuthCodeLength()} digits`
-                }
+                pattern: { value: new RegExp(`^\\d{${getRequiredAuthCodeLength()}}$`), message: `Must be exactly ${getRequiredAuthCodeLength()} digits` }
               })}
               type="password"
               maxLength={getRequiredAuthCodeLength()}
-              placeholder="0".repeat(getRequiredAuthCodeLength())
+              placeholder={'0'.repeat(getRequiredAuthCodeLength())}
               className={errors.authCode ? 'error' : ''}
             />
             {errors.authCode && <ErrorMessage>{errors.authCode.message}</ErrorMessage>}
           </FormGroup>
 
           <CheckboxContainer>
-            <input
-              type="checkbox"
-              checked={isOnline}
-              onChange={(e) => setIsOnline(e.target.checked)}
-            />
+            <input type="checkbox" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />
             <Label>Online Transaction</Label>
           </CheckboxContainer>
 
@@ -438,38 +375,22 @@ function PaymentTerminal() {
         </Form>
       </TerminalCard>
 
-      {/* Current Transaction Status */}
       {currentTransaction && (
         <TerminalCard>
           <h3>Current Transaction</h3>
           <StatusPanel>
-            <StatusItem>
-              <span>Transaction ID:</span>
-              <span>{currentTransaction.transactionId}</span>
-            </StatusItem>
-            <StatusItem>
-              <span>Amount:</span>
-              <span>${currentTransaction.amount}</span>
-            </StatusItem>
-            <StatusItem>
-              <span>Card:</span>
-              <span>****{currentTransaction.cardNumber?.slice(-4)}</span>
-            </StatusItem>
+            <StatusItem><span>Transaction ID:</span><span>{currentTransaction.transactionId}</span></StatusItem>
+            <StatusItem><span>Amount:</span><span>${currentTransaction.amount}</span></StatusItem>
+            <StatusItem><span>Card:</span><span>****{currentTransaction.cardNumber?.slice(-4)}</span></StatusItem>
             <StatusItem>
               <span>Status:</span>
-              <StatusBadge status={currentTransaction.status}>
-                {currentTransaction.status?.toUpperCase()}
-              </StatusBadge>
+              <StatusBadge status={currentTransaction.status}>{currentTransaction.status?.toUpperCase()}</StatusBadge>
             </StatusItem>
-            <StatusItem>
-              <span>Protocol:</span>
-              <span>{currentTransaction.protocol}</span>
-            </StatusItem>
+            <StatusItem><span>Protocol:</span><span>{currentTransaction.protocol}</span></StatusItem>
           </StatusPanel>
         </TerminalCard>
       )}
 
-      {/* MTI Notifications */}
       {mtiNotifications.length > 0 && (
         <TerminalCard>
           <h3>Real-time Notifications</h3>
@@ -478,16 +399,10 @@ function PaymentTerminal() {
               <StatusItem key={index}>
                 <div>
                   <strong>MTI {notification.mti}</strong>
-                  <div style={{ fontSize: '14px', color: '#666' }}>
-                    {notification.message}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#999' }}>
-                    {new Date(notification.timestamp).toLocaleTimeString()}
-                  </div>
+                  <div style={{ fontSize: '14px', color: '#666' }}>{notification.message}</div>
+                  <div style={{ fontSize: '12px', color: '#999' }}>{new Date(notification.timestamp).toLocaleTimeString()}</div>
                 </div>
-                <StatusBadge status={notification.status}>
-                  {notification.status?.toUpperCase()}
-                </StatusBadge>
+                <StatusBadge status={notification.status}>{notification.status?.toUpperCase()}</StatusBadge>
               </StatusItem>
             ))}
           </StatusPanel>
