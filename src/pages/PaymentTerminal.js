@@ -384,7 +384,7 @@ function PaymentTerminal() {
                 className={errors.cvv ? 'error' : ''}
               />
               {errors.cvv && <ErrorMessage>{errors.cvv.message}</ErrorMessage>}
-            </FormGroup
+            </FormGroup>
           </CardRow>
 
           <FormGroup>
