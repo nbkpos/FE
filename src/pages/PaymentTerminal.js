@@ -385,3 +385,116 @@ function PaymentTerminal() {
               />
               {errors.cvv && <ErrorMessage>{errors.cvv.message}</ErrorMessage>}
             </FormGroup
+          </CardRow>
+
+          <FormGroup>
+            <Label>Protocol</Label>
+            <Select
+              {...register('protocol', { required: 'Protocol is required' })}
+            >
+              <option value="">Select Protocol</option>
+              {Object.keys(PROTOCOLS).map(protocol => (
+                <option key={protocol} value={protocol}>
+                  {protocol}
+                </option>
+              ))}
+            </Select>
+            {errors.protocol && <ErrorMessage>{errors.protocol.message}</ErrorMessage>}
+          </FormGroup>
+
+          <FormGroup>
+            <Label>
+              Authorization Code ({getRequiredAuthCodeLength()} digits)
+              <Lock size={16} style={{ marginLeft: '5px' }} />
+            </Label>
+            <Input
+              {...register('authCode', { 
+                required: 'Authorization code is required',
+                pattern: {
+                  value: new RegExp(`^\\d{${getRequiredAuthCodeLength()}}$`),
+                  message: `Must be exactly ${getRequiredAuthCodeLength()} digits`
+                }
+              })}
+              type="password"
+              maxLength={getRequiredAuthCodeLength()}
+              placeholder="0".repeat(getRequiredAuthCodeLength())
+              className={errors.authCode ? 'error' : ''}
+            />
+            {errors.authCode && <ErrorMessage>{errors.authCode.message}</ErrorMessage>}
+          </FormGroup>
+
+          <CheckboxContainer>
+            <input
+              type="checkbox"
+              checked={isOnline}
+              onChange={(e) => setIsOnline(e.target.checked)}
+            />
+            <Label>Online Transaction</Label>
+          </CheckboxContainer>
+
+          <ProcessButton type="submit" disabled={processing}>
+            {processing ? 'Processing...' : 'Process Payment'}
+          </ProcessButton>
+        </Form>
+      </TerminalCard>
+
+      {/* Current Transaction Status */}
+      {currentTransaction && (
+        <TerminalCard>
+          <h3>Current Transaction</h3>
+          <StatusPanel>
+            <StatusItem>
+              <span>Transaction ID:</span>
+              <span>{currentTransaction.transactionId}</span>
+            </StatusItem>
+            <StatusItem>
+              <span>Amount:</span>
+              <span>${currentTransaction.amount}</span>
+            </StatusItem>
+            <StatusItem>
+              <span>Card:</span>
+              <span>****{currentTransaction.cardNumber?.slice(-4)}</span>
+            </StatusItem>
+            <StatusItem>
+              <span>Status:</span>
+              <StatusBadge status={currentTransaction.status}>
+                {currentTransaction.status?.toUpperCase()}
+              </StatusBadge>
+            </StatusItem>
+            <StatusItem>
+              <span>Protocol:</span>
+              <span>{currentTransaction.protocol}</span>
+            </StatusItem>
+          </StatusPanel>
+        </TerminalCard>
+      )}
+
+      {/* MTI Notifications */}
+      {mtiNotifications.length > 0 && (
+        <TerminalCard>
+          <h3>Real-time Notifications</h3>
+          <StatusPanel>
+            {mtiNotifications.map((notification, index) => (
+              <StatusItem key={index}>
+                <div>
+                  <strong>MTI {notification.mti}</strong>
+                  <div style={{ fontSize: '14px', color: '#666' }}>
+                    {notification.message}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#999' }}>
+                    {new Date(notification.timestamp).toLocaleTimeString()}
+                  </div>
+                </div>
+                <StatusBadge status={notification.status}>
+                  {notification.status?.toUpperCase()}
+                </StatusBadge>
+              </StatusItem>
+            ))}
+          </StatusPanel>
+        </TerminalCard>
+      )}
+    </TerminalContainer>
+  );
+}
+
+export default PaymentTerminal;
