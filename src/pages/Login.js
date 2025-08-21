@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { CreditCard, Lock, Mail, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { CreditCard, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginContainer = styled.div`
@@ -132,11 +132,6 @@ const InputIcon = styled.div`
   left: 16px;
   color: #a0aec0;
   z-index: 1;
-  transition: color 0.3s ease;
-
-  ${Input}:focus + & {
-    color: #667eea;
-  }
 `;
 
 const PasswordToggle = styled.button`
@@ -164,8 +159,6 @@ const LoginButton = styled(motion.button)`
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-top: 10px;
@@ -174,21 +167,6 @@ const LoginButton = styled(motion.button)`
     opacity: 0.7;
     cursor: not-allowed;
   }
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-  }
-
-  &:hover:not(:disabled)::before {
-    left: 100%;
-  }
 `;
 
 const ErrorMessage = styled(motion.span)`
@@ -196,34 +174,6 @@ const ErrorMessage = styled(motion.span)`
   font-size: 13px;
   font-weight: 500;
   margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-const DemoCredentials = styled(motion.div)`
-  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-  border-radius: 12px;
-  padding: 20px;
-  margin-top: 30px;
-  border: 1px solid #e2e8f0;
-`;
-
-const DemoTitle = styled.h3`
-  color: #4a5568;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const DemoItem = styled.div`
-  color: #718096;
-  font-size: 13px;
-  margin-bottom: 4px;
-  font-family: 'Monaco', 'Menlo', monospace;
 `;
 
 function Login() {
@@ -234,10 +184,8 @@ function Login() {
 
   const onSubmit = async (data) => {
     setLoading(true);
-    
     try {
       const result = await login(data.email, data.password);
-      
       if (result.success) {
         toast.success('🎉 Welcome to Payment Terminal!');
       } else {
@@ -255,19 +203,13 @@ function Login() {
       <LoginCard
         initial={{ opacity: 0, y: 50, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ 
-          duration: 0.6,
-          type: "spring",
-          stiffness: 100,
-          damping: 15
-        }}
+        transition={{ duration: 0.6, type: "spring", stiffness: 100, damping: 15 }}
       >
         <Title>
-          <CreditCard size={32} />
-          Payment Terminal
+          <CreditCard size={32} /> Payment Terminal
         </Title>
         <Subtitle>Secure • Fast • Reliable</Subtitle>
-        
+
         <Form onSubmit={handleSubmit(onSubmit)}>
           <InputGroup>
             <Label>Email Address</Label>
@@ -284,19 +226,9 @@ function Login() {
                 placeholder="Enter your email address"
                 className={errors.email ? 'error' : ''}
               />
-              <InputIcon>
-                <Mail size={20} />
-              </InputIcon>
+              <InputIcon><Mail size={20} /></InputIcon>
             </InputWrapper>
-            {errors.email && (
-              <ErrorMessage
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                {errors.email.message}
-              </ErrorMessage>
-            )}
+            {errors.email && <ErrorMessage>{errors.email.message}</ErrorMessage>}
           </InputGroup>
 
           <InputGroup>
@@ -305,18 +237,27 @@ function Login() {
               <Input
                 {...register('password', { 
                   required: 'Password is required',
-                  minLength: {
-                    value: 6,
-                    message: 'Password must be at least 6 characters'
-                  }
+                  minLength: { value: 6, message: 'Password must be at least 6 characters' }
                 })}
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
                 className={errors.password ? 'error' : ''}
               />
-              <InputIcon>
-                <Lock size={20} />
-              </InputIcon>
-              <PasswordToggle
-                type="button"
-                onClick={() => setShowPassword(!)
+              <InputIcon><Lock size={20} /></InputIcon>
+              <PasswordToggle type="button" onClick={() => setShowPassword(!showPassword)}>
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </PasswordToggle>
+            </InputWrapper>
+            {errors.password && <ErrorMessage>{errors.password.message}</ErrorMessage>}
+          </InputGroup>
+
+          <LoginButton type="submit" disabled={loading}>
+            {loading ? 'Logging in...' : 'Login'}
+          </LoginButton>
+        </Form>
+      </LoginCard>
+    </LoginContainer>
+  );
+}
+
+export default Login;
