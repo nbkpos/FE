@@ -179,7 +179,7 @@ const PROTOCOLS = {
 };
 
 function PaymentTerminal() {
-  const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, watch, setValue, reset, trigger, formState: { errors } } = useForm();
   const [processing, setProcessing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState(null);
   const [mtiNotifications, setMtiNotifications] = useState([]);
@@ -201,35 +201,49 @@ function PaymentTerminal() {
     return v;
   };
 
-  const handleCardNumberChange = (e) => setValue('cardNumber', formatCardNumber(e.target.value));
-  const handleExpiryDateChange = (e) => setValue('expiryDate', formatExpiryDate(e.target.value));
+  const handleCardNumberChange = (e) => {
+    const formatted = formatCardNumber(e.target.value);
+    setValue('cardNumber', formatted);
+    trigger('cardNumber');
+  };
 
+  const handleExpiryDateChange = (e) => {
+    const formatted = formatExpiryDate(e.target.value);
+    setValue('expiryDate', formatted);
+    trigger('expiryDate');
+  };
+
+  // Reset authCode when protocol changes
   useEffect(() => {
-    if (socket) {
-      const handler = (notification) => {
-        setMtiNotifications(prev => [notification, ...prev.slice(0, 9)]);
+    setValue('authCode', '');
+  }, [selectedProtocol]);
 
-        if (notification.transactionId === currentTransaction?.transactionId) {
-          setCurrentTransaction(prev => ({
-            ...prev,
-            status: notification.status,
-            lastUpdate: notification.timestamp
-          }));
+  // Socket subscription
+  useEffect(() => {
+    if (!socket) return;
+
+    const handler = (notification) => {
+      setMtiNotifications(prev => [notification, ...prev.slice(0, 9)]);
+
+      setCurrentTransaction(prev => {
+        if (notification.transactionId === prev?.transactionId) {
+          return { ...prev, status: notification.status, lastUpdate: notification.timestamp };
         }
+        return prev;
+      });
 
-        if (notification.mti === '0110') {
-          notification.status === 'approved' ? toast.success('Transaction Approved!') : toast.error('Transaction Declined');
-        } else if (notification.mti === '0210' && notification.status === 'completed') {
-          toast.success('Payment Completed!');
-        } else if (notification.mti === 'PAYOUT') {
-          toast.info(`Payout initiated via ${notification.payoutMethod}`);
-        }
-      };
+      if (notification.mti === '0110') {
+        notification.status === 'approved' ? toast.success('Transaction Approved!') : toast.error('Transaction Declined');
+      } else if (notification.mti === '0210' && notification.status === 'completed') {
+        toast.success('Payment Completed!');
+      } else if (notification.mti === 'PAYOUT') {
+        toast.info(`Payout initiated via ${notification.payoutMethod}`);
+      }
+    };
 
-      socket.on('mti_notification', handler);
-      return () => socket.off('mti_notification', handler);
-    }
-  }, [socket, currentTransaction]);
+    socket.on('mti_notification', handler);
+    return () => socket.off('mti_notification', handler);
+  }, [socket]);
 
   const onSubmit = async (data) => {
     setProcessing(true);
@@ -330,6 +344,7 @@ function PaymentTerminal() {
                 })}
                 type="password"
                 maxLength={4}
+                inputMode="numeric"
                 placeholder="000"
                 className={errors.cvv ? 'error' : ''}
               />
